@@ -76,16 +76,25 @@
   /* ---------- mobile burger ---------- */
   var burger = $('#vb-f7k-burger');
   var nav = $('.vb-f7k-nav', root);
-  function closeNav() { if (nav && nav.classList.contains('vb-f7k-nav--open')) { nav.classList.remove('vb-f7k-nav--open'); burger && burger.setAttribute('aria-expanded', 'false'); } }
-  if (burger && nav) {
-    burger.addEventListener('click', function () {
-      var open = nav.classList.toggle('vb-f7k-nav--open');
-      burger.setAttribute('aria-expanded', open ? 'true' : 'false');
-    });
+  var header = $('#vb-f7k-header');
+  function setHeaderBottom() { if (header) root.style.setProperty('--vb-f7k-hdr-bottom', Math.round(header.getBoundingClientRect().bottom) + 'px'); }
+  function openNav() {
+    if (!nav) return; setHeaderBottom();
+    nav.classList.add('vb-f7k-nav--open'); document.body.classList.add('vb-f7k-menu-open');
+    if (burger) { burger.setAttribute('aria-expanded', 'true'); burger.setAttribute('aria-label', 'Закрыть меню'); }
   }
-  var st = document.createElement('style');
-  st.textContent = '@media (max-width:1100px){.vb-f7k .vb-f7k-nav.vb-f7k-nav--open{display:flex;position:absolute;top:100%;left:0;right:0;flex-direction:column;background:var(--vb-f7k-bg);padding:18px 24px 24px;gap:14px;border-bottom:1px solid var(--vb-f7k-line-2);box-shadow:var(--vb-f7k-shadow-soft);}}';
-  document.head.appendChild(st);
+  function closeNav() {
+    if (!nav || !nav.classList.contains('vb-f7k-nav--open')) return;
+    nav.classList.remove('vb-f7k-nav--open'); document.body.classList.remove('vb-f7k-menu-open');
+    if (burger) { burger.setAttribute('aria-expanded', 'false'); burger.setAttribute('aria-label', 'Открыть меню'); }
+  }
+  if (burger && nav) {
+    burger.addEventListener('click', function (e) { e.stopPropagation(); nav.classList.contains('vb-f7k-nav--open') ? closeNav() : openNav(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeNav(); });
+    document.addEventListener('click', function (e) { if (nav.classList.contains('vb-f7k-nav--open') && !nav.contains(e.target) && !burger.contains(e.target)) closeNav(); });
+    window.addEventListener('resize', function () { if (window.innerWidth > 1100) closeNav(); else setHeaderBottom(); });
+    window.addEventListener('scroll', setHeaderBottom, { passive: true });
+  }
 
   /* ---------- phone mask +7 (999) 999-99-99 ---------- */
   function formatPhone(value) {
