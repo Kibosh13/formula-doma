@@ -27,6 +27,18 @@
   function getUtm() { try { return JSON.parse(sessionStorage.getItem('fd_utm') || '{}'); } catch (e) { return {}; } }
   function getRef() { try { return sessionStorage.getItem('fd_ref') || ''; } catch (e) { return ''; } }
 
+  /* ---------- кнопки «Заказать расчёт» / «Подробнее»: подставляем категорию / акцию в анкету ---------- */
+  root.addEventListener('click', function (event) {
+    var link = event.target.closest('a[data-category], a[data-comment]');
+    if (!link) return;
+    var f = document.getElementById('vb-f7k-form');
+    if (!f) return;
+    var cat = link.getAttribute('data-category');
+    if (cat && f.elements.category) { f.elements.category.value = cat; f.elements.category.dispatchEvent(new Event('change')); }
+    var note = link.getAttribute('data-comment');
+    if (note && f.elements.comment && f.elements.comment.value.indexOf(note) < 0) f.elements.comment.value = (note + '. ' + f.elements.comment.value).trim();
+  });
+
   /* ---------- smooth anchor scroll ---------- */
   root.addEventListener('click', function (event) {
     var link = event.target.closest('a[href^="#"]');
@@ -245,7 +257,7 @@
     // автозаполнение анкеты для авторизованных
     if (currentUser && form) {
       if (!form.elements.name.value) form.elements.name.value = currentUser.name || '';
-      if (!form.elements.phone.value) form.elements.phone.value = currentUser.phone || '';
+      if (!form.elements.phone.value && /^\+7/.test(currentUser.phone || '')) form.elements.phone.value = currentUser.phone;
     }
     renderAccount();
   }
