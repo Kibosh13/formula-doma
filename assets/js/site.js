@@ -39,6 +39,8 @@
     if (note && f.elements.comment && f.elements.comment.value.indexOf(note) < 0) f.elements.comment.value = (note + '. ' + f.elements.comment.value).trim();
   });
 
+  document.querySelectorAll('[data-year]').forEach(function (el) { el.textContent = new Date().getFullYear(); });
+
   /* ---------- smooth anchor scroll ---------- */
   root.addEventListener('click', function (event) {
     var link = event.target.closest('a[href^="#"]');
