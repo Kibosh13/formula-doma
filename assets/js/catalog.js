@@ -56,19 +56,89 @@
   var HEART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 1 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.6z"></path></svg>';
   var PLACEHOLDER = '<div class="fd-noimg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg></div>';
 
+  var ARROW_L = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>';
+  var ARROW_R = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>';
+  function slideHtml(u, alt, lazy) {
+    return '<div class="fd-slide"><img class="fd-fit" src="' + esc(src(u)) + '" alt="' + esc(alt) + '"' + (lazy ? ' loading="lazy"' : '') + ' draggable="false"></div>';
+  }
   function cardHtml(p, data) {
     var cat = catBySlug(data, p.category);
     var fav = Store.isFav(p.id);
+    var imgs = (p.images || []).slice(0, 6);
+    var media = imgs.length
+      ? '<a class="fd-car__track" href="product.html?id=' + p.id + '" aria-label="' + esc(p.title) + '">' + imgs.map(function (u, i) { return slideHtml(u, i ? '' : p.title, i > 0); }).join('') + '</a>' +
+        (imgs.length > 1 ? '<button type="button" class="fd-car__btn fd-car__btn--prev" data-car="-1" aria-label="Предыдущее фото">' + ARROW_L + '</button>' +
+          '<button type="button" class="fd-car__btn fd-car__btn--next" data-car="1" aria-label="Следующее фото">' + ARROW_R + '</button>' +
+          '<div class="fd-car__dots" aria-hidden="true">' + imgs.map(function (_, i) { return '<i' + (i ? '' : ' class="is-on"') + '></i>'; }).join('') + '</div>' : '')
+      : '<a class="fd-car__track" href="product.html?id=' + p.id + '">' + PLACEHOLDER + '</a>';
     return '<article class="fd-card">' +
-      '<a class="fd-card__img" href="product.html?id=' + p.id + '">' + (p.images && p.images[0] ? '<img src="' + esc(src(p.images[0])) + '" alt="' + esc(p.title) + '" loading="lazy">' : PLACEHOLDER) + '</a>' +
+      '<div class="fd-card__img fd-car">' + media + '</div>' +
       '<button type="button" class="fd-fav' + (fav ? ' is-on' : '') + '" data-fav="' + p.id + '" aria-pressed="' + fav + '" aria-label="В избранное">' + HEART + '</button>' +
       '<div class="fd-card__body">' +
         (cat ? '<span class="fd-card__cat">' + esc(cat.name) + '</span>' : '') +
         '<a class="fd-card__title" href="product.html?id=' + p.id + '">' + esc(p.title) + '</a>' +
         '<div class="fd-card__price">' + priceHtml(p) + '</div>' +
-        '<button type="button" class="vb-f7k-btn vb-f7k-btn--primary fd-card__buy" data-add="' + p.id + '"><span class="t-btnflex__text">В корзину</span></button>' +
+        '<button type="button" class="vb-f7k-btn vb-f7k-btn--primary fd-card__buy" data-add="' + p.id + '"><span class="t-btnflex__text">' + (p.price == null ? 'Запросить цену' : 'В корзину') + '</span></button>' +
       '</div></article>';
   }
+
+  /* ---------- вписывание фото: студийный кадр (ровный фон по краям) — целиком на фоне его же цвета,
+     интерьер/деталь — на весь кадр. Так нет «полей» и товар не обрезается. ---------- */
+  var fitCanvas = null;
+  function fitImage(img) {
+    function run() {
+      if (!img.naturalWidth) return;
+      try {
+        if (!fitCanvas) fitCanvas = document.createElement('canvas');
+        var N = 40; fitCanvas.width = N; fitCanvas.height = N;
+        var ctx = fitCanvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, N, N);
+        var d = ctx.getImageData(0, 0, N, N).data, px = [];
+        for (var i = 0; i < N; i++) { [[i, 0], [i, 1], [i, N - 1], [i, N - 2], [0, i], [1, i], [N - 1, i], [N - 2, i]].forEach(function (c) { var o = (c[1] * N + c[0]) * 4; px.push([d[o], d[o + 1], d[o + 2]]); }); }
+        var m = [0, 0, 0]; px.forEach(function (q) { m[0] += q[0]; m[1] += q[1]; m[2] += q[2]; }); m = m.map(function (v) { return v / px.length; });
+        var sd = 0; px.forEach(function (q) { sd += Math.pow(q[0] - m[0], 2) + Math.pow(q[1] - m[1], 2) + Math.pow(q[2] - m[2], 2); }); sd = Math.sqrt(sd / px.length / 3);
+        if (sd < 9) { img.classList.add('is-contain'); img.parentNode.style.backgroundColor = 'rgb(' + m.map(Math.round).join(',') + ')'; }
+        else img.classList.remove('is-contain');
+      } catch (e) {}
+      img.classList.add('is-ready');
+    }
+    if (img.complete && img.naturalWidth) run(); else img.addEventListener('load', run, { once: true });
+  }
+  function fitAll(root) { $$('img.fd-fit', root).forEach(fitImage); }
+
+  /* ---------- карусели (карточки и галерея товара): свайп, стрелки, точки ---------- */
+  function carIndex(track) { return Math.round(track.scrollLeft / Math.max(1, track.clientWidth)); }
+  function carGo(track, i) {
+    var n = track.children.length; i = Math.max(0, Math.min(n - 1, i));
+    track.scrollTo({ left: i * track.clientWidth, behavior: 'smooth' });
+  }
+  function initCarousels(root) {
+    $$('.fd-car', root).forEach(function (car) {
+      if (car._init) return; car._init = true;
+      var track = car.querySelector('.fd-car__track, .fd-gallery__track'); if (!track) return;
+      var dots = $$('.fd-car__dots i', car), counter = car.querySelector('[data-car-counter]');
+      var onScroll = function () {
+        var i = carIndex(track);
+        dots.forEach(function (d, k) { d.classList.toggle('is-on', k === i); });
+        if (counter) counter.textContent = (i + 1) + ' / ' + track.children.length;
+        car.classList.toggle('is-first', i === 0); car.classList.toggle('is-last', i === track.children.length - 1);
+        if (car._onChange) car._onChange(i);
+      };
+      track.addEventListener('scroll', function () { clearTimeout(track._t); track._t = setTimeout(onScroll, 60); }, { passive: true });
+      $$('[data-car]', car).forEach(function (b) {
+        b.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); carGo(track, carIndex(track) + Number(b.getAttribute('data-car'))); });
+      });
+      // мышью можно «перетащить» слайд на десктопе
+      var down = null;
+      track.addEventListener('pointerdown', function (e) { if (e.pointerType === 'mouse') down = { x: e.clientX, l: track.scrollLeft, moved: false }; });
+      window.addEventListener('pointermove', function (e) { if (!down) return; var dx = e.clientX - down.x; if (Math.abs(dx) > 5) { down.moved = true; track.classList.add('is-drag'); track.scrollLeft = down.l - dx; } });
+      window.addEventListener('pointerup', function () { if (!down) return; var moved = down.moved; track.classList.remove('is-drag'); if (moved) { carGo(track, carIndex(track)); track._blockClick = true; setTimeout(function () { track._blockClick = false; }, 50); } down = null; });
+      track.addEventListener('click', function (e) { if (track._blockClick) { e.preventDefault(); e.stopPropagation(); } }, true);
+      onScroll();
+    });
+  }
+  window.FDCarousel = { init: initCarousels, fit: fitAll };
+
   function emptyHtml(title, text) {
     return '<div class="fd-empty"><h3>' + esc(title) + '</h3><p>' + esc(text) + '</p>' +
       '<div class="fd-empty__actions"><a class="vb-f7k-btn vb-f7k-btn--primary" href="index.html#vb-f7k-anketa"><span class="t-btnflex__text">Заказать расчёт</span><span class="vb-f7k-btn__arrow" aria-hidden="true">→</span></a>' +
@@ -142,16 +212,21 @@
       root.innerHTML =
         '<div class="fd-product">' +
           '<div class="fd-gallery">' +
-            '<div class="fd-gallery__main">' + (imgs[0] ? '<img id="fd-main-img" src="' + esc(src(imgs[0])) + '" alt="' + esc(p.title) + '">' : PLACEHOLDER) + '</div>' +
-            (imgs.length > 1 ? '<div class="fd-gallery__thumbs">' + imgs.map(function (u, i) { return '<button type="button" class="' + (i ? '' : 'is-active') + '" data-img="' + esc(src(u)) + '" aria-label="Фото ' + (i + 1) + '"><img src="' + esc(src(u)) + '" alt="" loading="lazy"></button>'; }).join('') + '</div>' : '') +
+            (imgs.length ? '<div class="fd-gallery__stage fd-car">' +
+              '<div class="fd-gallery__track">' + imgs.map(function (u, i) { return slideHtml(u, i ? p.title + ', фото ' + (i + 1) : p.title, i > 1); }).join('') + '</div>' +
+              (imgs.length > 1 ? '<button type="button" class="fd-car__btn fd-car__btn--prev" data-car="-1" aria-label="Предыдущее фото">' + ARROW_L + '</button>' +
+                '<button type="button" class="fd-car__btn fd-car__btn--next" data-car="1" aria-label="Следующее фото">' + ARROW_R + '</button>' +
+                '<span class="fd-gallery__counter" data-car-counter>1 / ' + imgs.length + '</span>' : '') +
+            '</div>' : '<div class="fd-gallery__stage">' + PLACEHOLDER + '</div>') +
+            (imgs.length > 1 ? '<div class="fd-gallery__thumbs">' + imgs.map(function (u, i) { return '<button type="button" class="' + (i ? '' : 'is-active') + '" data-goto="' + i + '" aria-label="Фото ' + (i + 1) + '"><img src="' + esc(src(u)) + '" alt="" loading="lazy"></button>'; }).join('') + '</div>' : '') +
           '</div>' +
           '<div class="fd-info">' +
             (cat ? '<a class="vb-f7k-eyebrow" href="catalog.html?c=' + cat.slug + '">' + esc(cat.name) + '</a>' : '') +
             '<h1 class="fd-info__title">' + esc(p.title) + '</h1>' +
             '<div class="fd-info__price">' + priceHtml(p) + '</div>' +
             '<div class="fd-info__actions">' +
-              '<div class="fd-qty" data-qty-box><button type="button" data-qty-dec aria-label="Меньше">−</button><input type="number" min="1" max="99" value="1" aria-label="Количество"><button type="button" data-qty-inc aria-label="Больше">+</button></div>' +
-              '<button type="button" class="vb-f7k-btn vb-f7k-btn--primary vb-f7k-btn--lg" data-add="' + p.id + '" id="fd-add-btn"><span class="t-btnflex__text">В корзину</span></button>' +
+              '<div class="fd-qty" data-qty-box' + (p.price == null ? ' hidden' : '') + '><button type="button" data-qty-dec aria-label="Меньше">−</button><input type="number" min="1" max="99" value="1" aria-label="Количество"><button type="button" data-qty-inc aria-label="Больше">+</button></div>' +
+              '<button type="button" class="vb-f7k-btn vb-f7k-btn--primary vb-f7k-btn--lg" data-add="' + p.id + '" id="fd-add-btn"><span class="t-btnflex__text">' + (p.price == null ? 'Запросить цену' : 'В корзину') + '</span></button>' +
               '<button type="button" class="vb-f7k-btn vb-f7k-btn--ghost vb-f7k-btn--lg fd-fav-btn' + (fav ? ' is-on' : '') + '" data-fav="' + p.id + '" aria-pressed="' + fav + '">' + HEART + '<span class="fd-fav__label">' + (fav ? 'В избранном' : 'В избранное') + '</span></button>' +
             '</div>' +
             '<a class="fd-info__calc" href="index.html#vb-f7k-anketa">Нужны другие размеры или материалы? Закажите расчёт →</a>' +
@@ -162,9 +237,16 @@
       var related = data.products.filter(function (x) { return x.category === p.category && x.id !== p.id; }).slice(0, 4);
       if (related.length) root.innerHTML += '<h2 class="fd-subtitle">Ещё в разделе «' + esc(cat ? cat.name : '') + '»</h2><div class="fd-grid">' + related.map(function (x) { return cardHtml(x, data); }).join('') + '</div>';
       // галерея
-      $$('.fd-gallery__thumbs button', root).forEach(function (b) {
-        b.addEventListener('click', function () { $('#fd-main-img').src = b.getAttribute('data-img'); $$('.fd-gallery__thumbs button', root).forEach(function (x) { x.classList.toggle('is-active', x === b); }); });
-      });
+      var stage = $('.fd-gallery__stage', root), gTrack = stage && stage.querySelector('.fd-gallery__track'), thumbs = $$('.fd-gallery__thumbs button', root);
+      if (stage && gTrack) {
+        stage._onChange = function (i) {
+          thumbs.forEach(function (t, k) { t.classList.toggle('is-active', k === i); });
+          var t = thumbs[i]; if (t && t.parentNode.scrollWidth > t.parentNode.clientWidth) t.parentNode.scrollTo({ left: t.offsetLeft - t.parentNode.clientWidth / 2 + t.clientWidth / 2, behavior: 'smooth' });
+        };
+        thumbs.forEach(function (t) { t.addEventListener('click', function () { carGo(gTrack, Number(t.getAttribute('data-goto'))); }); });
+        stage.tabIndex = 0;
+        stage.addEventListener('keydown', function (e) { if (e.key === 'ArrowRight') carGo(gTrack, carIndex(gTrack) + 1); if (e.key === 'ArrowLeft') carGo(gTrack, carIndex(gTrack) - 1); });
+      }
       // количество
       var box = $('[data-qty-box]', root), inp = box.querySelector('input'), addBtn = $('#fd-add-btn');
       function setQ(v) { v = Math.max(1, Math.min(99, parseInt(v, 10) || 1)); inp.value = v; addBtn.setAttribute('data-qty', v); }
@@ -243,6 +325,11 @@
       if (r.user) { if (!form.elements.name.value) form.elements.name.value = r.user.name || ''; if (!form.elements.phone.value && /^\+7/.test(r.user.phone || '')) form.elements.phone.value = r.user.phone; }
     }).catch(function () {});
   }
+
+  // любые новые карточки/галереи на странице — подключаем карусель и вписывание фото
+  var mo = new MutationObserver(function () { clearTimeout(mo._t); mo._t = setTimeout(function () { fitAll(document); initCarousels(document); }, 0); });
+  mo.observe(document.body, { childList: true, subtree: true });
+  window.addEventListener('resize', function () { $$('.fd-car__track, .fd-gallery__track').forEach(function (t) { t.scrollLeft = 0; }); });
 
   renderCatalog(); renderProduct(); renderFavorites(); renderCart(); initCheckout();
 })();
