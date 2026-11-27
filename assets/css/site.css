@@ -1148,3 +1148,8 @@ body.vb-f7k-menu-open .vb-f7k .vb-f7k-header{background:var(--vb-f7k-bg)}
   .vb-f7k .fd-card__cat{font-size:.64rem;letter-spacing:.08em}
 }
 .vb-f7k .fd-qty[hidden]{display:none}
+
+/* ===== новый логотип ФД (монограмма) ===== */
+.vb-f7k .vb-f7k-header img.vb-f7k-logo__mark{width:70px;height:44px;object-fit:contain}
+.vb-f7k .fd-footer__brand img{width:58px;height:37px}
+@media (max-width:640px){.vb-f7k .vb-f7k-header img.vb-f7k-logo__mark{width:54px!important;height:34px!important}}
